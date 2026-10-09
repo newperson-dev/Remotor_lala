@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      JoystickView 可在 XML 里直接配置的属性（代码里也有同名 setter）。
+      config.yaml 的 controls 段会覆盖这里的值，所以两者都能改，优先 yaml。
+    -->
+    <declare-styleable name="JoystickView">
+        <!-- 摇杆轴向：both=二维圆形摇杆, horizontal=横向一维, vertical=纵向一维 -->
+        <attr name="jvAxis" format="enum">
+            <enum name="both" value="0" />
+            <enum name="horizontal" value="1" />
+            <enum name="vertical" value="2" />
+        </attr>
+        <!-- 推到最大时输出的数值 -->
+        <attr name="jvMaxValue" format="integer" />
+        <!-- 中心死区，0~0.9，表示半径的多少比例内不输出 -->
+        <attr name="jvDeadZone" format="float" />
+        <attr name="jvInvertX" format="boolean" />
+        <attr name="jvInvertY" format="boolean" />
+        <attr name="jvBaseColor" format="color" />
+        <attr name="jvStickColor" format="color" />
+        <attr name="jvLabelColor" format="color" />
+        <!-- 控件底部的小字标签，例如 "平移" "升降" -->
+        <attr name="jvLabel" format="string" />
+        <attr name="jvLabelSize" format="dimension" />
+        <!-- 底盘半径 / 摇杆头半径相对控件短边的比例，默认 0.4 / 0.4 -->
+        <attr name="jvBaseRadiusRatio" format="float" />
+        <attr name="jvStickRadiusRatio" format="float" />
+    </declare-styleable>
+</resources>

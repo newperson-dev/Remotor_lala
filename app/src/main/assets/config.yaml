@@ -1,0 +1,194 @@
+# ============================================================================
+#  Remotor_lala 全局配置文件（唯一改动入口）
+# ============================================================================
+#  改完本文件后：重新运行 App 即可生效，不需要改 Java，也不需要改 XML。
+#
+#  想改什么，看这一段：
+#    · 遥控指令的帧格式 / 增加新指令        -> protocol 段
+#    · 控件的位置、大小、边距、对齐方式      -> layout 段（支持 dp / px / 百分比 /
+#                                            match_parent / wrap_content）
+#    · 摇杆的数量、类型、输出范围、协议绑定  -> controls 段（复制一段即可加摇杆，
+#                                             enabled: false 即可临时去掉一个）
+#    · 心跳周期、是否空闲也发              -> heartbeat 段
+#    · 配色、字号、回传区最大行数、全屏方式  -> ui 段
+#
+#  语法提示：
+#    · 缩进只能用空格，不要用 Tab，同层缩进要对齐（推荐 2 空格）
+#    · 换行符要写在双引号里才会转义，例如 "\n"
+#    · 值不加引号时，纯数字会被当成数字，文本请加引号更安全
+# ============================================================================
+
+
+# ---------------------------------------------------------------------------
+# 1. 通信协议（JDY-31 透传：纯 ASCII 文本，一行一帧）
+# ---------------------------------------------------------------------------
+protocol:
+  header: "$"                 # 帧头（仅作文档/校验参考，真正拼接以 templates 为准）
+  footer: "#"                 # 帧尾
+  terminator: "\n"            # 帧结束符，下位机可用 Serial.readStringUntil('\n')
+                              # 写 "" 表示不加结束符
+
+  minValue: -100              # 数值下限（超出会被裁剪）
+  maxValue: 100               # 数值上限
+
+  # 指令模板：<名字> 是占位符，会被 controls 段里的实际值替换
+  #   可用占位符：<x> <y> <value> <id> <name>
+  #   想新增指令？在这里加一行，然后在 controls 段里用 template: 你的键名 引用即可
+  templates:
+    joystick2d: "$J,<x>,<y>#"          # 二维摇杆：$J,<x>,<y>#\n
+    joystick1d: "$ARM,<id>,<value>#"   # 一维摇杆：$ARM,<id>,<value>#\n
+
+
+# ---------------------------------------------------------------------------
+# 2. 心跳（防下位机超时失控）
+# ---------------------------------------------------------------------------
+heartbeat:
+  enabled: true               # 关掉就只在触摸时发送
+  intervalMs: 100             # 发送周期（毫秒），0~100Hz 实测可用；建议 50~200
+  sendWhenIdle: true          # true=不管有没有操作都按周期发；false=只发变化过的状态
+
+
+# ---------------------------------------------------------------------------
+# 3. 界面配色 / 字号
+# ---------------------------------------------------------------------------
+ui:
+  showLastSentFrame: true     # 顶部状态栏是否显示最近发出的帧内容
+  receivedMaxLines: 300       # 回传数据区最多保留多少行（防止内存无限增长）
+  statusTextSizeSp: 14
+  receivedTextSizeSp: 14
+
+  # 全屏（横屏游戏那种效果）：藏掉系统自带的 时间/电量 状态栏与导航栏。
+  # 用户从屏幕边缘下滑可以把它们临时唤出来，片刻后自动隐藏。
+  fullscreen:
+    hideSystemBars: true      # false = 保留系统状态栏（例如需要边充电边看电量的场景）
+    respectCutout: true       # true = 内容避开挖孔/刘海，避免文字被摄像头挡住（挖孔屏建议 true）
+
+  colors:
+    background: "#121212"     # 整个界面底色
+    panel: "#222222"          # 回传数据区底色
+    statusBar: "#333333"      # 顶部状态栏底色
+    textPrimary: "#FFFFFF"
+    textReceived: "#00FF00"
+
+
+# ---------------------------------------------------------------------------
+# 4. 布局：任何控件的宽高 / 边距 / 对齐，都可以在这里改（按控件 id 匹配）
+# ---------------------------------------------------------------------------
+#  width / height 支持：
+#      "220dp"   固定大小（只写数字默认按 dp 处理，如 "220"）
+#      "120px"   固定像素
+#      "25%"     相对父容器百分比
+#      "0dp"     约束布局里的“撑满剩余空间”（配合上下或左右约束）
+#      match_parent / wrap_content
+#  margin* 只写 dp，weight 只在 LinearLayout 里生效。
+#  anchor（可选）：只写就按“上/下 + 左/右”吸附到父容器，
+#      可选 top_start / top_center / top_end / center / center_start / center_end /
+#           bottom_start / bottom_center / bottom_end；不写则保留 XML 里的约束。
+#  scale：全局尺寸缩放（1.0 = 原样，1.2 = 全部放大 20%），临时改大改小很方便。
+# ---------------------------------------------------------------------------
+layout:
+  apply: true                 # false = 完全使用 XML/dimens 里的尺寸，忽略下面的配置
+  scale: 1.0
+
+  views:
+    # 左下角二维摇杆
+    - id: joystickView
+      width: "220dp"
+      height: "220dp"
+      marginStart: "32dp"
+      marginBottom: "32dp"
+      anchor: "bottom_start"
+
+    # 右侧机械臂面板（横屏右侧 25% 宽）
+    - id: rightPanel
+      width: "25%"
+      height: "0dp"
+      marginEnd: "16dp"
+
+    # 中间回传数据滚动区
+    - id: receivedScroll
+      marginStart: "16dp"
+      marginEnd: "16dp"
+      marginTop: "8dp"
+      marginBottom: "16dp"
+
+    # 右侧两个一维摇杆：在面板里左右平分（weight: 1 需要 width: "0dp"）
+    - id: armLift
+      width: "0dp"
+      height: "match_parent"
+      weight: 1
+      marginStart: "8dp"
+      marginEnd: "8dp"
+      marginTop: "8dp"
+      marginBottom: "8dp"
+
+    - id: armGrip
+      width: "0dp"
+      height: "match_parent"
+      weight: 1
+      marginStart: "8dp"
+      marginEnd: "8dp"
+      marginTop: "8dp"
+      marginBottom: "8dp"
+
+
+# ---------------------------------------------------------------------------
+# 5. 控件（摇杆）定义
+# ---------------------------------------------------------------------------
+#  id        必须和 XML 里的 @+id/xxx 同名；XML 里没有的 id 会自动按配置创建，
+#            并加入 container 指定的容器（默认 rightPanel）。
+#  enabled   默认 true。写 false = 这个摇杆不绑定也不发送（XML 里若声明过会被隐藏），
+#            想临时去掉一个摇杆又不想删 XML 时很方便。
+#  type      joystick2d = 二维摇杆（圆形）；joystick1d = 一维摇杆（长条轨道）
+#  axis      both / horizontal / vertical（1D 只有 horizontal 或 vertical）
+#  template  写 protocol.templates 里的键名，或者直接写一整条帧模板字符串
+#  commandId 填充模板里的 <id>，下位机用它区分是哪个关节
+#  maxValue  摇杆推到最大时输出的数值（2D 会同时作用于 x、y）
+#  deadZone  死区，0.05 = 中心 5% 半径内不输出（防手抖）
+#  invert    1D 摇杆方向取反；invertX / invertY 单独取反某个轴
+#  heartbeat 该控件是否参与心跳重复发送
+# ---------------------------------------------------------------------------
+controls:
+  # ------------------------------- 二维摇杆：底盘平移 -------------------------------
+  - id: joystickView
+    type: joystick2d
+    axis: both
+    template: joystick2d
+    maxValue: 100
+    deadZone: 0.05
+    invertX: false
+    invertY: false
+    label: "平移"
+    baseColor: "#333333"
+    stickColor: "#00FF00"
+    heartbeat: true
+
+  # ------------------------------- 一维摇杆：机械臂升降 -------------------------------
+  # 输出 $ARM,lift,<value>#\n ，value 为 -100..100，下位机按“速度增量”处理
+  - id: armLift
+    type: joystick1d
+    axis: vertical
+    template: joystick1d
+    commandId: "lift"
+    maxValue: 100
+    deadZone: 0.08
+    invert: false
+    label: "升降"
+    baseColor: "#2A2A2A"
+    stickColor: "#00C8FF"
+    heartbeat: true
+
+  # ------------------------------- 一维摇杆：夹爪开合 -------------------------------
+  # 输出 $ARM,grip,<value>#\n
+  - id: armGrip
+    type: joystick1d
+    axis: vertical
+    template: joystick1d
+    commandId: "grip"
+    maxValue: 100
+    deadZone: 0.08
+    invert: false
+    label: "开合"
+    baseColor: "#2A2A2A"
+    stickColor: "#FFB300"
+    heartbeat: true

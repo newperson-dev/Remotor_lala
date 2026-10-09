@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  布局说明：
+  · 这里声明的是“结构”（有哪些控件、彼此怎么约束）；
+  · 具体尺寸尽量用 @dimen/... 引用，方便在 values/dimens.xml 里统一改；
+  · 运行后 config.yaml 的 layout.views 会按 id 覆盖宽高 / 边距 / 锚点，
+    所以调大小既可以改 dimens.xml，也可以改 config.yaml（后者不用重新编译资源）。
+  · 摇杆的数量与协议绑定在 config.yaml 的 controls 段；XML 里没有的控件会自动创建。
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212">
+
+    <!-- ================= 顶部状态栏与连接按钮 ================= -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="#333333"
+        android:gravity="center"
+        android:padding="8dp"
+        android:text="状态: 未连接"
+        android:textColor="#FFFFFF"
+        android:textSize="@dimen/status_text_size"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/btnConnect"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <Button
+        android:id="@+id/btnConnect"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minHeight="0dp"
+        android:minWidth="0dp"
+        android:padding="4dp"
+        android:text="连接蓝牙设备"
+        android:textSize="@dimen/connect_button_text_size"
+        app:layout_constraintBottom_toBottomOf="@id/tvStatus"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- ================= 左下角：二维摇杆（底盘平移） ================= -->
+    <com.cheer_team.remotor_lala.JoystickView
+        android:id="@+id/joystickView"
+        android:layout_width="@dimen/joystick2d_size"
+        android:layout_height="@dimen/joystick2d_size"
+        android:layout_marginStart="@dimen/joystick2d_margin"
+        android:layout_marginBottom="@dimen/joystick2d_margin"
+        app:jvAxis="both"
+        app:jvBaseColor="#333333"
+        app:jvDeadZone="0.05"
+        app:jvLabel="平移"
+        app:jvMaxValue="100"
+        app:jvStickColor="#00FF00"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- ================= 中间：下位机回传数据显示区 ================= -->
+    <ScrollView
+        android:id="@+id/receivedScroll"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="@dimen/received_margin"
+        android:layout_marginTop="@dimen/received_margin_top"
+        android:layout_marginEnd="@dimen/received_margin"
+        android:layout_marginBottom="@dimen/received_margin"
+        android:background="#222222"
+        android:padding="@dimen/received_padding"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/rightGuide"
+        app:layout_constraintStart_toEndOf="@id/joystickView"
+        app:layout_constraintTop_toBottomOf="@id/tvStatus">
+
+        <TextView
+            android:id="@+id/tvReceived"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="接收到的数据将显示在这里..."
+            android:textColor="#00FF00"
+            android:textSize="@dimen/received_text_size" />
+    </ScrollView>
+
+    <!-- ================= 右侧 25%：机械臂一维摇杆面板 ================= -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/rightGuide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.75" />
+
+    <LinearLayout
+        android:id="@+id/rightPanel"
+        android:layout_width="@dimen/right_panel_width"
+        android:layout_height="0dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/rightGuide"
+        app:layout_constraintTop_toBottomOf="@id/tvStatus">
+
+        <!-- 机械臂升降：纵向一维摇杆 -->
+        <com.cheer_team.remotor_lala.JoystickView
+            android:id="@+id/armLift"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_margin="@dimen/joystick1d_margin"
+            android:layout_weight="1"
+            app:jvAxis="vertical"
+            app:jvBaseColor="#2A2A2A"
+            app:jvDeadZone="0.08"
+            app:jvLabel="升降"
+            app:jvMaxValue="100"
+            app:jvStickColor="#00C8FF" />
+
+        <!-- 夹爪开合：纵向一维摇杆 -->
+        <com.cheer_team.remotor_lala.JoystickView
+            android:id="@+id/armGrip"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_margin="@dimen/joystick1d_margin"
+            android:layout_weight="1"
+            app:jvAxis="vertical"
+            app:jvBaseColor="#2A2A2A"
+            app:jvDeadZone="0.08"
+            app:jvLabel="开合"
+            app:jvMaxValue="100"
+            app:jvStickColor="#FFB300" />
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

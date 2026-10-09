@@ -1,0 +1,102 @@
+项目背景说明书：Remotor_lala 安卓遥控器App
+
+1. 项目概述
+项目名称：Remotor_lala
+技术栈：Java, Android原生开发 (AppCompat, ConstraintLayout, 自定义View)
+硬件环境：自组车/机械臂，使用JDY-31经典蓝牙SPP透传模块（默认波特率115200）
+开发缘由：参考项目SRMCCRemoter由于使用了复杂的自定义二进制协议（0xA5 0x5A帧头、序列号、CRC8校验、流式解码器），在配合JDY-31透传模式时出现严重乱码、粘包导致无法解析的问题。因此决定抛弃复杂协议，回归纯文本透传模式。
+
+2. 通信协议（透传格式）
+波特率：115200.
+数据格式：ASCII字符串。
+帧格式：$<指令>,<参数...>#\n （模板可配置，见第 6 节）
+  $：帧头
+  J：二维摇杆标识（$J,<x>,<y>#）
+  ARM：一维摇杆标识（$ARM,<id>,<value>#），<id> 用于区分关节（lift=升降 / grip=开合 / ...）
+  <x>、<y>：摇杆X/Y轴数值，整数，范围 -100 到 100
+  <value>：一维摇杆数值，整数，范围 -100 到 100（速度增量型）
+  #：帧尾
+  \n：换行符（0x0A），便于下位机使用 Serial.readStringUntil('\n') 解析。
+发送频率：触摸事件实时发送 + 定时心跳（默认100ms，可配置开关，实测0-100Hz可用）。
+回传格式：App端直接显示下位机发送的任意字符串（无特殊格式要求）。
+协议扩展与完整字段说明见根目录 CONFIG_GUIDE.md。
+
+3. 代码结构（当前已实现）
+包名：com.cheer_team.remotor_lala
+MainActivity.java
+  读取 assets/config.yaml，按配置绑定或动态创建摇杆控件，拼帧发送；
+  权限申请（BLUETOOTH_CONNECT, BLUETOOTH_SCAN, ACCESS_FINE_LOCATION）；
+  配对设备列表弹窗（连接按钮长按可断开连接）；
+  心跳定时发送；回传数据实时显示（可滚动，限制最大行数防内存增长）；
+  已添加 FLAG_KEEP_SCREEN_ON 保持屏幕常亮。
+  ——本文件不再包含任何硬编码的协议格式或控件尺寸，改协议/改大小不用动它。
+JoystickView.java
+  自定义View，一个控件支持三种模式：二维（圆形底盘）、纵向一维、横向一维（长条轨道+滑块）；
+  触控限制最大行程，映射到 -maxValue..+maxValue，通过 JoystickListener 回调 onMove(x,y) / onRelease()；
+  松手自动回中；支持死区、方向取反、配色、底部文字标签；
+  XML 属性：app:jvAxis / jvMaxValue / jvDeadZone / jvInvertX / jvInvertY / jvBaseColor / jvStickColor /
+  jvLabel / jvLabelColor / jvLabelSize / jvBaseRadiusRatio / jvStickRadiusRatio，代码里有同名 setter。
+HeartbeatSender.java
+  基于 ScheduledExecutorService 的定时心跳（周期下限10ms），生命周期跟随 Activity（onPause 停止）。
+BluetoothSppManager.java
+  经典蓝牙SPP连接管理，固定RFCOMM UUID：00001101-0000-1000-8000-00805F9B34FB；
+  独立线程负责连接与读取，单线程队列负责发送（避免高频率心跳反复建线程）；
+  结束符由 setTerminator() 统一追加（取自配置，默认 \n），调用方只传负载；
+  使用 Handler 将回调切回主线程。
+config/ 配置系统（零第三方依赖，可离线编译）
+  SimpleYaml.java      极简 YAML 子集解析器（注释/嵌套/对象列表/引号转义/类型推断）
+  AppConfig.java       总入口 AppConfig.load(context)，配置问题统一收集到 warnings
+  ProtocolConfig.java  帧头/帧尾/结束符/数值范围/指令模板表
+  ControlConfig.java   一个摇杆 = 类型+轴向+模板+commandId+量程+死区+取反+配色+心跳开关+容器
+  LayoutConfig.java / ViewLayout.java / SizeSpec.java / LayoutApplier.java
+                       按 id 覆盖控件的宽高/边距/锚点/weight，支持 dp、px、百分比、match_parent
+  FrameBuilder.java    将 <x> <y> <value> <id> <name> 填入模板
+  HeartbeatConfig.java / UiConfig.java
+AndroidManifest.xml
+  已配置蓝牙权限和定位权限；MainActivity 已设置 android:screenOrientation="landscape" 强制横屏。
+
+4. 当前UI布局（横屏，基于ConstraintLayout）
+沉浸式全屏：默认隐藏系统状态栏（时间/电量）与导航栏，边缘下滑可临时唤出，片刻自动隐藏；
+  配置在 config.yaml 的 ui.fullscreen（hideSystemBars / respectCutout），
+  实现见 MainActivity.applyFullscreen()（edge-to-edge + SHORT_EDGES 挖孔模式 + hide(systemBars)
+  + 只对挖孔区域做 padding + onWindowFocusChanged 再隐藏一次，兼容 OriginOS 等 ROM）。
+顶部：tvStatus（状态显示，展示最近发出的帧）、btnConnect（连接按钮，长按断开）。
+左下角：joystickView（二维摇杆，默认220dp，外边距32dp，底部标签“平移”）。
+中间：receivedScroll > tvReceived（回传数据显示区，可滚动，绿色文本，最多300行）。
+右侧25%：rightPanel（横向LinearLayout），内含两个一维摇杆：
+  armLift（升降，青色，输出 $ARM,lift,<value>#）
+  armGrip（开合，橙色，输出 $ARM,grip,<value>#）
+尺寸优先级：config.yaml 的 layout.views ＞ res/values/dimens.xml ＞ XML 里写死的值。
+（原来留白的 rightControlPanel 已由 rightPanel 取代，一维摇杆不再是占位。）
+
+5. 待办事项 / 下一步开发计划
+[x] 右侧一维摇杆开发：JoystickView 增加纵向/横向一维模式，右侧面板已放入升降与开合两个摇杆。
+[x] 通信协议扩展：协议模板化，默认 $J,<x>,<y># 与 $ARM,<id>,<value>#，可任意新增指令（含示例）。
+[x] 心跳机制：heartbeat 段配置（enabled / intervalMs / sendWhenIdle），默认100ms；每个控件可单独退出心跳。
+[x] 机械臂控制逻辑：一维摇杆按“速度增量”输出 -100..100，松手立即发 value=0 帧；
+    下位机把 value 当速度积分成位置即可（具体方向与系数需与下位机联调）。
+[ ] 下位机联调：确认 lift / grip 的正负方向与速度系数（App 端可用 invert / maxValue 调整）。
+[ ] 可选：给升降换成“位置保持型”滑条（松手不回中）——可在 JoystickView 增加 springReturn 开关并在
+    config.yaml 里暴露，做法与现有 axis 模式一致。
+
+6. 配置驱动的设计（本次重构重点）
+6.1 唯一改动入口：app/src/main/assets/config.yaml
+  protocol    帧头/帧尾/结束符/数值范围/指令模板（新增指令只在这里加一行 templates）
+  heartbeat   心跳开关、周期、是否空闲也发
+  ui          配色、字号、回传区最大行数、是否显示最近发出的帧
+  layout      全局 scale + 每个控件的宽高/边距/锚点/weight（dp、px、百分比、match_parent 都支持）
+  controls    摇杆清单：类型、轴向、模板、commandId、量程、死区、取反、配色、标签、心跳开关、动态创建时的容器
+6.2 复用方式（同一份配置，Java 与 XML 都能用）
+  · XML 已声明同名 id  → 按配置绑定，并覆盖尺寸/位置；
+  · XML 没有该 id      → 自动创建控件并加入 container 指定的容器（默认 rightPanel）；
+  · Java 里可直接 new JoystickView(context) 配 setter，或直接用 AppConfig / FrameBuilder / LayoutApplier；
+  · 尺寸三条路线：config.yaml（推荐，不改 XML/Java）、res/values/dimens.xml（纯XML）、Java setter。
+6.3 复制 / 添加 / 去除摇杆
+  · 添加：把 controls 里的某一段整体复制，改 id（必须唯一）、commandId、label/stickColor，
+    并在 layout.views 里补一条同名 id 的尺寸配置；XML 不用动（自动创建并加入 rightPanel）。
+  · 去除：只写在 yaml 里的直接删掉那段；也写在 XML 里的删掉对应 JoystickView 块；
+    临时不用则写 enabled: false（不绑定、不发送，XML 里声明过的会自动隐藏）。
+  · 新增到根布局（ConstraintLayout）的摇杆必须在 layout.views 里写 anchor，否则会自动居中并提示。
+6.4 安全性
+  配置写错不会崩溃：问题收集到 AppConfig.warnings 并显示在回传区顶部（【配置提醒】）；
+  单元测试会校验随包发布的 config.yaml，配置有警告即测试失败。

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      纯 XML 改尺寸的入口：只改这里就能调整布局（不需要动 Java）。
+      注意：如果 config.yaml 的 layout.apply 为 true，则 layout.views 里的同名配置会覆盖这里的值；
+      想让这里生效，把 config.yaml 里对应的 layout.views 项删掉，或把 layout.apply 设为 false。
+    -->
+    <dimen name="joystick2d_size">220dp</dimen>
+    <dimen name="joystick2d_margin">32dp</dimen>
+
+    <dimen name="joystick1d_height">0dp</dimen>
+    <dimen name="joystick1d_margin">8dp</dimen>
+
+    <dimen name="right_panel_width">0dp</dimen>
+    <dimen name="right_panel_margin">16dp</dimen>
+
+    <dimen name="received_margin">16dp</dimen>
+    <dimen name="received_margin_top">8dp</dimen>
+    <dimen name="received_padding">12dp</dimen>
+
+    <dimen name="status_text_size">14sp</dimen>
+    <dimen name="received_text_size">14sp</dimen>
+    <dimen name="connect_button_text_size">12sp</dimen>
+</resources>
